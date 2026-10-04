@@ -3,5 +3,15 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
+  },
+  "python.defaultInterpreterPath": "${workspaceFolder}/api/venv/bin/python",
+  "python.analysis.extraPaths": ["${workspaceFolder}/api"],
+  "python.terminal.activateEnvironment": true,
+  "files.exclude": {
+    "api/venv": true,
+    "**/__pycache__": true
+  },
+  "search.exclude": {
+    "api/venv": true
   }
 }

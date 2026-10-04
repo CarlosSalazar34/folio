@@ -1,1 +1,7 @@
-{ "recommendations": ["expo.vscode-expo-tools"] }
+{
+  "recommendations": [
+    "expo.vscode-expo-tools",
+    "ms-python.python",
+    "ms-python.vscode-pylance"
+  ]
+}
