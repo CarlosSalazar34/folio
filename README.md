@@ -1,56 +1,30 @@
-# Welcome to your Expo app 👋
+# folio
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**Todo tu papel, en orden.**
 
-## Get started
+Folio es una app móvil para escanear documentos impulsada por IA. Apuntas la cámara a un contrato, una factura o un DNI y Folio detecta los bordes, recorta, mejora la imagen y lo guarda como PDF. La IA se encarga de lo tedioso: reconocer el texto, ponerle nombre al documento, clasificarlo y dejarlo listo para encontrarlo después con una búsqueda.
 
-1. Install dependencies
+> 🚧 En desarrollo temprano. Las funciones de abajo son el objetivo del proyecto; no todas están implementadas todavía.
 
-   ```bash
-   npm install
-   ```
+## Funciones
 
-2. Start the app
+- **Escaneo inteligente** — detección automática de bordes, corrección de perspectiva y filtros (Original, Nítido, Grises, B/N).
+- **Documentos de varias páginas** — captura varias hojas seguidas y reordénalas, gíralas o bórralas antes de guardar.
+- **Reconocimiento de texto (OCR)** — el texto de cada escaneo queda seleccionable y se puede copiar.
+- **Organización con IA** — nombres automáticos ("Factura de luz — septiembre"), categorías (recibos, contratos, identidad…) y extracción de datos clave como fechas e importes.
+- **Búsqueda por contenido** — busca por lo que dice el documento, no solo por su nombre.
+- **Exportar y compartir** — PDF listo para enviar desde la hoja de compartir del sistema.
 
-   ```bash
-   npx expo start
-   ```
+## Stack
 
-In the output, you'll find options to open the app in a
+| Parte | Tecnología |
+|---|---|
+| App móvil | [Expo](https://expo.dev) · React Native · TypeScript |
+| Navegación | [Expo Router](https://docs.expo.dev/router/introduction) con pestañas y headers nativos |
+| Estilos | [NativeWind](https://www.nativewind.dev) (Tailwind CSS) |
+| API | [FastAPI](https://fastapi.tiangolo.com) · Python · SQLModel |
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Diseño
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- **Colores:** Tinta `#121212` · Papel `#F3F2EE` · Cobalto `#2747F5` (acciones) · Lima `#C6F432` (detección) · Grafito `#5E5D58`
+- **Tipografía:** Bricolage Grotesque (títulos), Geist (interfaz), Geist Mono (metadatos)
