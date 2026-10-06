@@ -5,7 +5,7 @@ import { GeistMono_400Regular, GeistMono_500Medium } from "@expo-google-fonts/ge
 import { useFonts } from "expo-font";
 import { router, Stack, useNavigationContainerRef } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { getPreference, usePreference } from "@/features/preferences/preferences";
 import { ScanSessionProvider } from "@/features/scan/ScanSession";
@@ -27,6 +27,9 @@ export default function RootLayout() {
   // Evita presentar el onboarding dos veces (p. ej. efectos duplicados de StrictMode en desarrollo).
   const onboardingPresented = useRef(false);
   const navigationRef = useNavigationContainerRef();
+  // Solo la primera presentación (con el splash delante) va sin animación; en cuanto el
+  // onboarding está en pantalla se reactiva, para que al cerrarlo sí se vea la transición.
+  const [onboardingShown, setOnboardingShown] = useState(false);
 
   useEffect(() => {
     if (fontError) console.warn("No se pudieron cargar las fuentes", fontError);
@@ -61,11 +64,15 @@ export default function RootLayout() {
         }
         // Si la app se abrió con un enlace directo a /onboarding, no presentarlo dos veces.
         if (isOnOnboarding()) {
+          setOnboardingShown(true);
           hideSplash();
           return;
         }
         unsubscribe = navigationRef.addListener("state", () => {
-          if (isOnOnboarding()) hideSplash();
+          if (isOnOnboarding()) {
+            setOnboardingShown(true);
+            hideSplash();
+          }
         });
         // Red de seguridad: no dejar el splash colgado si algo falla.
         fallback = setTimeout(hideSplash, 1500);
@@ -92,7 +99,7 @@ export default function RootLayout() {
       <Stack.Screen name="(tabs)"/>
       <Stack.Screen name="escanear" options={{ presentation: "fullScreenModal", animation: "slide_from_bottom", contentStyle: { backgroundColor: "black" } }}/>
       <Stack.Screen name="revisar" options={{ presentation: "fullScreenModal", animation: "slide_from_bottom", contentStyle: { backgroundColor: "#F3F2EE" } }}/>
-      <Stack.Screen name="onboarding" options={{ presentation: "fullScreenModal", gestureEnabled: false, animation: onboardingCompleted ? "default" : "none", contentStyle: { backgroundColor: "#F3F2EE" } }}/>
+      <Stack.Screen name="onboarding" options={{ presentation: "fullScreenModal", gestureEnabled: false, animation: onboardingCompleted || onboardingShown ? "fade" : "none", contentStyle: { backgroundColor: "#F3F2EE" } }}/>
       <Stack.Screen name="perfil" options={{ presentation: "modal", headerShown: true, contentStyle: { backgroundColor: "#F3F2EE" } }}/>
     </Stack>
   </ScanSessionProvider>;

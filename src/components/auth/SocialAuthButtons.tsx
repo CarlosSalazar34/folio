@@ -4,7 +4,13 @@ import { Alert, Pressable, Text, View } from "react-native";
 
 import { colors } from "@/constants/colors";
 
-export type AuthProvider = "apple" | "google";
+export type AuthProvider = "apple" | "google" | "email";
+
+export const AUTH_PROVIDER_LABELS: Record<AuthProvider, string> = {
+    apple: "Apple",
+    google: "Google",
+    email: "correo",
+};
 
 type Props = {
     /** Por defecto muestra "Próximamente": el inicio de sesión real llegará más adelante. */
@@ -34,6 +40,14 @@ export function SocialAuthButtons({ onPress }: Props) {
         >
             <Image source={require("@/assets/images/google-g.svg")} style={{ width: 18, height: 18 }} contentFit="contain" accessibilityIgnoresInvertColors />
             <Text className="text-ink text-base font-sans-semibold">Continuar con Google</Text>
+        </Pressable>
+        <Pressable
+            accessibilityRole="button"
+            onPress={() => press("email")}
+            className="h-13 rounded-full bg-white border border-[#D9D7D0] flex-row items-center justify-center gap-2 active:opacity-80"
+        >
+            <SymbolView name="envelope.fill" size={17} tintColor={colors.ink} />
+            <Text className="text-ink text-base font-sans-semibold">Crear cuenta con correo</Text>
         </Pressable>
     </View>;
 }
