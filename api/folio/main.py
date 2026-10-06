@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from folio.config import get_settings
 from folio.db import create_db_and_tables
+from folio.routes import documents
 
 
 @asynccontextmanager
@@ -20,6 +21,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(documents.router)
 
 
 @app.get("/health")

@@ -1,0 +1,298 @@
+"""Rutas de documentos: listar, buscar, crear (escaneo + IA), ver, borrar y exportar a PDF."""
+import io
+import logging
+import re
+import unicodedata
+from datetime import UTC
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Annotated, cast
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
+from PIL import Image, UnidentifiedImageError
+from sqlalchemy.orm import selectinload
+from sqlmodel import Session, col, or_, select
+
+from folio import ai, imaging
+from folio import storage as storage_module
+from folio.ai import Corners, DocumentAnalysis, PageAnalysis
+from folio.db import get_session
+from folio.models import Document, Page
+from folio.schemas import CATEGORIES, Category, DocumentDetailOut, DocumentSummaryOut, KeyField, PageOut
+from folio.storage import Storage
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/documents", tags=["documents"])
+
+MAX_PAGES = 30
+MAX_PAGE_BYTES = 15 * 1024 * 1024
+JPEG = "image/jpeg"
+
+
+# --- Dependencias (sobrescribibles en tests) ---------------------------------------------------
+
+
+def get_storage() -> Storage:
+    return storage_module.get_storage()
+
+
+Analyzer = Callable[[list[bytes]], DocumentAnalysis]
+
+
+def get_analyzer() -> Analyzer:
+    # Se resuelve en cada llamada para no capturar la función del módulo al importar.
+    return lambda images: ai.analyze_pages(images)
+
+
+@dataclass(frozen=True)
+class Imaging:
+    correct_perspective: Callable[[bytes, Corners | None, float], bytes]
+    enhance: Callable[[bytes], bytes]
+    make_thumbnail: Callable[[bytes], bytes]
+    image_size: Callable[[bytes], tuple[int, int]]
+    build_pdf: Callable[[list[bytes]], bytes]
+
+
+def get_imaging() -> Imaging:
+    return Imaging(
+        correct_perspective=lambda img, corners, conf: imaging.correct_perspective(img, corners, conf),
+        enhance=lambda img: imaging.enhance(img),
+        make_thumbnail=lambda img: imaging.make_thumbnail(img),
+        image_size=lambda img: imaging.image_size(img),
+        build_pdf=lambda pages: imaging.build_pdf(pages),
+    )
+
+
+SessionDep = Annotated[Session, Depends(get_session)]
+StorageDep = Annotated[Storage, Depends(get_storage)]
+AnalyzerDep = Annotated[Analyzer, Depends(get_analyzer)]
+ImagingDep = Annotated[Imaging, Depends(get_imaging)]
+
+
+# --- Serialización ------------------------------------------------------------------------------
+
+
+def _category(value: str) -> Category:
+    return cast(Category, value if value in CATEGORIES else "otro")
+
+
+def _summary(doc: Document, storage: Storage) -> DocumentSummaryOut:
+    first = doc.pages[0] if doc.pages else None
+    return DocumentSummaryOut(
+        id=doc.id,
+        title=doc.title,
+        category=_category(doc.category),
+        page_count=len(doc.pages),
+        # SQLite pierde la zona horaria al leer; las fechas se guardan siempre en UTC.
+        created_at=doc.created_at if doc.created_at.tzinfo else doc.created_at.replace(tzinfo=UTC),
+        thumbnail_url=storage.url(first.thumbnail_key) if first else None,
+    )
+
+
+def _detail(doc: Document, storage: Storage) -> DocumentDetailOut:
+    summary = _summary(doc, storage)
+    key_fields: list[KeyField] = []
+    for field in doc.key_fields or []:
+        try:
+            key_fields.append(KeyField.model_validate(field))
+        except ValueError:
+            continue
+    return DocumentDetailOut(
+        **summary.model_dump(),
+        summary=doc.summary,
+        text=doc.text,
+        key_fields=key_fields,
+        pages=[
+            PageOut(index=p.index, url=storage.url(p.image_key), width=p.width, height=p.height)
+            for p in doc.pages
+        ],
+    )
+
+
+def _get_document(session: Session, document_id: str) -> Document:
+    doc = session.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Documento no encontrado.")
+    return doc
+
+
+def _slugify(title: str) -> str:
+    ascii_title = unicodedata.normalize("NFKD", title).encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", ascii_title).strip("-").lower()
+    return slug[:80].strip("-") or "documento"
+
+
+def _read_page(upload: UploadFile, position: int) -> bytes:
+    data = upload.file.read(MAX_PAGE_BYTES + 1)
+    if len(data) > MAX_PAGE_BYTES:
+        raise HTTPException(
+            status.HTTP_413_CONTENT_TOO_LARGE,
+            f"La página {position} supera el límite de {MAX_PAGE_BYTES // (1024 * 1024)} MB.",
+        )
+    try:
+        with Image.open(io.BytesIO(data)) as img:
+            img.verify()
+    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, SyntaxError, ValueError):
+        raise HTTPException(
+            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            f"La página {position} no es una imagen válida.",
+        ) from None
+    return data
+
+
+def _delete_keys(storage: Storage, keys: list[str]) -> None:
+    for key in keys:
+        try:
+            storage.delete(key)
+        except Exception:
+            logger.warning("No se pudo borrar %s del almacenamiento", key, exc_info=True)
+
+
+# --- Rutas --------------------------------------------------------------------------------------
+# Los endpoints son síncronos: FastAPI los ejecuta en un threadpool, así que la IA, Pillow y S3
+# (bloqueantes) no frenan el event loop.
+
+
+@router.get("", response_model=list[DocumentSummaryOut])
+def list_documents(
+    session: SessionDep,
+    storage: StorageDep,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+) -> list[DocumentSummaryOut]:
+    stmt = (
+        select(Document)
+        .options(selectinload(Document.pages))  # type: ignore[arg-type]
+        .order_by(col(Document.created_at).desc(), col(Document.id).desc())
+    )
+    term = (q or "").strip()
+    if term:
+        stmt = stmt.where(
+            or_(
+                col(Document.title).icontains(term, autoescape=True),
+                col(Document.text).icontains(term, autoescape=True),
+            )
+        )
+    return [_summary(doc, storage) for doc in session.exec(stmt).all()]
+
+
+@router.get("/{document_id}", response_model=DocumentDetailOut)
+def get_document(document_id: str, session: SessionDep, storage: StorageDep) -> DocumentDetailOut:
+    return _detail(_get_document(session, document_id), storage)
+
+
+@router.post("", response_model=DocumentDetailOut, status_code=status.HTTP_201_CREATED)
+def create_document(
+    session: SessionDep,
+    storage: StorageDep,
+    analyze: AnalyzerDep,
+    img: ImagingDep,
+    pages: Annotated[list[UploadFile], File(description="Imágenes de las páginas, en orden")],
+    enhance: Annotated[bool, Form()] = True,
+) -> DocumentDetailOut:
+    if not pages:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Envía al menos una página.")
+    if len(pages) > MAX_PAGES:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, f"Máximo {MAX_PAGES} páginas por documento."
+        )
+    images = [_read_page(upload, i + 1) for i, upload in enumerate(pages)]
+
+    try:
+        analysis = analyze(images)
+    except Exception:
+        logger.exception("Fallo al analizar el documento con IA")
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            "No se pudo analizar el documento con IA. Inténtalo de nuevo en unos minutos.",
+        ) from None
+
+    page_analyses = list(analysis.pages[: len(images)])
+    page_analyses += [PageAnalysis() for _ in range(len(images) - len(page_analyses))]
+
+    doc = Document(
+        title=analysis.title.strip() or "Documento sin título",
+        category=_category(analysis.category),
+        summary=analysis.summary,
+        text=analysis.text,
+        key_fields=[kf.model_dump() for kf in analysis.key_fields],
+    )
+
+    stored: list[str] = []
+    try:
+        for index, (original, pa) in enumerate(zip(images, page_analyses, strict=True)):
+            processed = img.correct_perspective(original, pa.corners, pa.confidence)
+            if enhance:
+                processed = img.enhance(processed)
+            thumbnail = img.make_thumbnail(processed)
+            width, height = img.image_size(processed)
+
+            base = f"documents/{doc.id}/{index}"
+            keys = {
+                "original": f"{base}-original.jpg",
+                "page": f"{base}-page.jpg",
+                "thumb": f"{base}-thumb.jpg",
+            }
+            for kind, data in (("original", original), ("page", processed), ("thumb", thumbnail)):
+                storage.put(keys[kind], data, JPEG)
+                stored.append(keys[kind])
+
+            doc.pages.append(
+                Page(
+                    document_id=doc.id,
+                    index=index,
+                    image_key=keys["page"],
+                    original_key=keys["original"],
+                    thumbnail_key=keys["thumb"],
+                    width=width,
+                    height=height,
+                )
+            )
+
+        session.add(doc)
+        session.commit()
+    except Exception:
+        session.rollback()
+        _delete_keys(storage, stored)
+        logger.exception("Fallo al guardar el documento")
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "No se pudo guardar el documento. Inténtalo de nuevo.",
+        ) from None
+
+    session.refresh(doc)
+    return _detail(doc, storage)
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_document(document_id: str, session: SessionDep, storage: StorageDep) -> Response:
+    doc = _get_document(session, document_id)
+    keys = [k for p in doc.pages for k in (p.original_key, p.image_key, p.thumbnail_key)]
+    session.delete(doc)
+    session.commit()
+    # Primero la BD: si falla el borrado de algún archivo solo queda basura, nunca filas rotas.
+    _delete_keys(storage, keys)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/{document_id}/pdf",
+    response_class=Response,
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+def export_pdf(document_id: str, session: SessionDep, storage: StorageDep, img: ImagingDep) -> Response:
+    doc = _get_document(session, document_id)
+    if not doc.pages:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "El documento no tiene páginas.")
+    try:
+        pdf = img.build_pdf([storage.get(p.image_key) for p in doc.pages])
+    except Exception:
+        logger.exception("Fallo al generar el PDF de %s", document_id)
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, "No se pudo generar el PDF."
+        ) from None
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{_slugify(doc.title)}.pdf"'},
+    )
