@@ -1,7 +1,3 @@
-from fastapi import FastAPI
+from folio.main import app
 
-app = FastAPI()
-
-@app.get("/")
-async def root():
-    return {"message": "api arriba. ✅"}
+__all__ = ["app"]

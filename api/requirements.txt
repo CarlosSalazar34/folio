@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sqlmodel
+pydantic-settings
+python-multipart
+openai
+boto3
+pillow
+psycopg[binary]
+pytest
+httpx
