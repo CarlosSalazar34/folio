@@ -1,4 +1,4 @@
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 import { useState } from "react";
 import { FlatList, RefreshControl } from "react-native";
 
@@ -29,7 +29,7 @@ export default function HomeScreen() {
             onChangeText={(e) => setQuery(e.nativeEvent.text)}
         />
         <Stack.Toolbar placement="right">
-            <Stack.Toolbar.Button icon="person.crop.circle" accessibilityLabel="Perfil" onPress={() => {}} />
+            <Stack.Toolbar.Button icon="person.crop.circle" accessibilityLabel="Perfil" onPress={() => router.navigate("/perfil")} />
         </Stack.Toolbar>
         <FlatList
             data={documents}
