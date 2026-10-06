@@ -34,7 +34,15 @@ export function useDocumentActions(document: DocumentDetail | null) {
             const folder = new Directory(Paths.cache, "pdf", document.id);
             folder.create({ intermediates: true, idempotent: true });
             const destination = new File(folder, pdfFileName(document.title));
-            const file = await File.downloadFileAsync(pdfUrl(document.id), destination, { idempotent: true });
+            // El PDF ya está guardado en S3: se descarga directo de su URL prefirmada. Si falla
+            // (p. ej. la URL caducó), se pide a la API, que lo sirve o lo genera.
+            let file: File;
+            try {
+                if (!document.pdf_url) throw new Error("Sin URL directa del PDF");
+                file = await File.downloadFileAsync(document.pdf_url, destination, { idempotent: true });
+            } catch {
+                file = await File.downloadFileAsync(pdfUrl(document.id), destination, { idempotent: true });
+            }
             await Sharing.shareAsync(file.uri, {
                 mimeType: "application/pdf",
                 UTI: "com.adobe.pdf",

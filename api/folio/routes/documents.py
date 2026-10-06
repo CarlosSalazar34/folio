@@ -19,7 +19,7 @@ from folio.ai import Corners, DocumentAnalysis, PageAnalysis
 from folio.db import get_session
 from folio.models import Document, Page
 from folio.schemas import CATEGORIES, Category, DocumentDetailOut, DocumentSummaryOut, KeyField, PageOut
-from folio.storage import Storage
+from folio.storage import LocalStorage, S3Storage, Storage
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,7 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 MAX_PAGES = 30
 MAX_PAGE_BYTES = 15 * 1024 * 1024
 JPEG = "image/jpeg"
+PDF = "application/pdf"
 
 
 # --- Dependencias (sobrescribibles en tests) ---------------------------------------------------
@@ -90,7 +91,7 @@ def _summary(doc: Document, storage: Storage) -> DocumentSummaryOut:
     )
 
 
-def _detail(doc: Document, storage: Storage) -> DocumentDetailOut:
+def _detail(doc: Document, storage: Storage, pdf_url: str | None = None) -> DocumentDetailOut:
     summary = _summary(doc, storage)
     key_fields: list[KeyField] = []
     for field in doc.key_fields or []:
@@ -107,6 +108,7 @@ def _detail(doc: Document, storage: Storage) -> DocumentDetailOut:
             PageOut(index=p.index, url=storage.url(p.image_key), width=p.width, height=p.height)
             for p in doc.pages
         ],
+        pdf_url=pdf_url,
     )
 
 
@@ -139,6 +141,56 @@ def _read_page(upload: UploadFile, position: int) -> bytes:
             f"La página {position} no es una imagen válida.",
         ) from None
     return data
+
+
+def _pdf_key(document_id: str) -> str:
+    """Clave determinista del PDF: no hace falta columna en la BD."""
+    return f"documents/{document_id}/document.pdf"
+
+
+def _exists(storage: Storage, key: str) -> bool:
+    """Comprueba si existe una clave sin descargarla (HEAD en S3, stat en disco)."""
+    if isinstance(storage, LocalStorage):
+        return (storage.root / key).is_file()
+    if isinstance(storage, S3Storage):
+        from botocore.exceptions import ClientError
+
+        try:
+            storage.client.head_object(Bucket=storage.bucket, Key=storage.prefix + key)
+        except ClientError as e:
+            if e.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
+                return False
+            raise
+        return True
+    # Otros almacenamientos (p. ej. los falsos de los tests): descarga de prueba.
+    try:
+        storage.get(key)
+    except Exception:
+        return False
+    return True
+
+
+def _store_pdf(doc: Document, storage: Storage, img: Imaging) -> bytes:
+    pdf = img.build_pdf([storage.get(p.image_key) for p in doc.pages])
+    storage.put(_pdf_key(doc.id), pdf, PDF)
+    return pdf
+
+
+def _ensure_pdf(doc: Document, storage: Storage, img: Imaging) -> str | None:
+    """URL directa del PDF guardado; lo genera una sola vez para documentos antiguos.
+
+    Devuelve None si no hay páginas o si falla la generación (la app usa entonces `/pdf`).
+    """
+    if not doc.pages:
+        return None
+    key = _pdf_key(doc.id)
+    try:
+        if not _exists(storage, key):
+            _store_pdf(doc, storage, img)
+        return storage.url(key)
+    except Exception:
+        logger.exception("No se pudo preparar el PDF de %s", doc.id)
+        return None
 
 
 def _delete_keys(storage: Storage, keys: list[str]) -> None:
@@ -177,8 +229,11 @@ def list_documents(
 
 
 @router.get("/{document_id}", response_model=DocumentDetailOut)
-def get_document(document_id: str, session: SessionDep, storage: StorageDep) -> DocumentDetailOut:
-    return _detail(_get_document(session, document_id), storage)
+def get_document(
+    document_id: str, session: SessionDep, storage: StorageDep, img: ImagingDep
+) -> DocumentDetailOut:
+    doc = _get_document(session, document_id)
+    return _detail(doc, storage, _ensure_pdf(doc, storage, img))
 
 
 @router.post("", response_model=DocumentDetailOut, status_code=status.HTTP_201_CREATED)
@@ -219,13 +274,17 @@ def create_document(
     )
 
     stored: list[str] = []
+    pdf_key = _pdf_key(doc.id)
+    pdf_url: str | None = None
     try:
+        processed_pages: list[bytes] = []
         for index, (original, pa) in enumerate(zip(images, page_analyses, strict=True)):
             processed = img.correct_perspective(original, pa.corners, pa.confidence)
             if enhance:
                 processed = img.enhance(processed)
             thumbnail = img.make_thumbnail(processed)
             width, height = img.image_size(processed)
+            processed_pages.append(processed)
 
             base = f"documents/{doc.id}/{index}"
             keys = {
@@ -249,6 +308,17 @@ def create_document(
                 )
             )
 
+        # El PDF se genera una sola vez aquí; después la app lo descarga directo del almacenamiento.
+        # Si falla no se pierde el documento: se generará bajo demanda (detalle o `/pdf`).
+        try:
+            pdf_bytes = img.build_pdf(processed_pages)
+            stored.append(pdf_key)
+            storage.put(pdf_key, pdf_bytes, PDF)
+            pdf_url = storage.url(pdf_key)
+        except Exception:
+            logger.exception("No se pudo generar el PDF al crear %s; se generará después", doc.id)
+        del processed_pages
+
         session.add(doc)
         session.commit()
     except Exception:
@@ -261,13 +331,14 @@ def create_document(
         ) from None
 
     session.refresh(doc)
-    return _detail(doc, storage)
+    return _detail(doc, storage, pdf_url)
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_document(document_id: str, session: SessionDep, storage: StorageDep) -> Response:
     doc = _get_document(session, document_id)
     keys = [k for p in doc.pages for k in (p.original_key, p.image_key, p.thumbnail_key)]
+    keys.append(_pdf_key(doc.id))
     session.delete(doc)
     session.commit()
     # Primero la BD: si falla el borrado de algún archivo solo queda basura, nunca filas rotas.
@@ -284,8 +355,18 @@ def export_pdf(document_id: str, session: SessionDep, storage: StorageDep, img: 
     doc = _get_document(session, document_id)
     if not doc.pages:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "El documento no tiene páginas.")
+    # Compatibilidad: la app ahora descarga `pdf_url` directamente; esta ruta sirve el PDF guardado
+    # (o lo genera y guarda una vez si el documento es anterior al cambio).
     try:
-        pdf = img.build_pdf([storage.get(p.image_key) for p in doc.pages])
+        try:
+            pdf = storage.get(_pdf_key(doc.id))
+        except Exception:
+            pdf = img.build_pdf([storage.get(p.image_key) for p in doc.pages])
+            try:
+                storage.put(_pdf_key(doc.id), pdf, PDF)
+            except Exception:
+                # El PDF ya está en memoria: se sirve igualmente aunque no se haya podido guardar.
+                logger.warning("No se pudo guardar el PDF de %s", document_id, exc_info=True)
     except Exception:
         logger.exception("Fallo al generar el PDF de %s", document_id)
         raise HTTPException(
