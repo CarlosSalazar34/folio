@@ -12,6 +12,7 @@ import { UploadOverlay, type UploadPhase } from "@/components/review/UploadOverl
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { colors } from "@/constants/colors";
+import { getPreference } from "@/features/preferences/preferences";
 import { prepareForUpload, rotatePage } from "@/features/scan/prepareForUpload";
 import { useScanSession } from "@/features/scan/ScanSession";
 import { ApiError, uploadDocument } from "@/lib/api";
@@ -24,7 +25,7 @@ export default function ReviewScreen() {
     const { pages, replacePage, removePage, movePage, reset } = useScanSession();
     const [selected, setSelected] = useState(0);
     const [rotating, setRotating] = useState(false);
-    const [enhance, setEnhance] = useState(true);
+    const [enhance, setEnhance] = useState(() => getPreference("enhanceByDefault"));
     const [upload, setUpload] = useState<UploadState | null>(null);
 
     const current = Math.min(selected, Math.max(pages.length - 1, 0));
