@@ -9,3 +9,5 @@ pillow
 psycopg[binary]
 pytest
 httpx
+pwdlib[argon2]
+pyjwt

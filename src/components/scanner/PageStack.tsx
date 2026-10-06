@@ -1,13 +1,13 @@
 import { Image } from "expo-image";
 import { Text, View } from "react-native";
-import Animated, { ZoomIn } from "react-native-reanimated";
+import Animated, { FadeIn } from "react-native-reanimated";
 
 /** Miniatura de la última página capturada con el número total de páginas. */
 export function PageStack({ pages }: { pages: string[] }) {
     const count = pages.length;
 
     return <View className="w-16 h-16 justify-center">
-        {count > 0 && <Animated.View key={count} entering={ZoomIn.springify().damping(12)}>
+        {count > 0 && <Animated.View key={count} entering={FadeIn.duration(180)}>
             <Image
                 source={{ uri: pages.at(-1) }}
                 style={{ width: 48, height: 64, borderRadius: 6 }}

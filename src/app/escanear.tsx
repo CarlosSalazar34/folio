@@ -3,7 +3,7 @@ import * as Haptics from "expo-haptics";
 import { router, useIsFocused } from "expo-router";
 import { useRef, useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
-import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CaptureFlash } from "@/components/scanner/CaptureFlash";
@@ -81,7 +81,7 @@ export default function ScanScreen() {
     }
 
     return <View className="flex-1 bg-black">
-        {isFocused && <Animated.View entering={FadeIn.duration(450)} style={{ flex: 1 }}>
+        {isFocused && <Animated.View entering={FadeIn.duration(250)} style={{ flex: 1 }}>
             <CameraView
                 ref={cameraRef}
                 style={{ flex: 1 }}
@@ -97,7 +97,6 @@ export default function ScanScreen() {
 
         {/* Controles inferiores */}
         <Animated.View
-            entering={FadeInDown.delay(200).springify().damping(18)}
             className="absolute inset-x-0 bottom-0 bg-black/60 pt-4 gap-4"
             style={{ paddingBottom: insets.bottom + 16 }}
         >
@@ -112,7 +111,7 @@ export default function ScanScreen() {
                 <ShutterButton onPress={capture} disabled={!ready || capturing} dimmed={!ready} />
 
                 <View className="w-16 h-11">
-                    {pages.length > 0 && <Animated.View entering={ZoomIn.springify().damping(14)}>
+                    {pages.length > 0 && <Animated.View entering={FadeIn.duration(180)}>
                         <Pressable
                             accessibilityRole="button"
                             accessibilityLabel={`Listo, revisar ${pagesLabel(pages.length)}`}

@@ -9,8 +9,20 @@ def _uuid() -> str:
     return uuid.uuid4().hex
 
 
+class User(SQLModel, table=True):
+    __tablename__ = "users"  # "user" es palabra reservada en Postgres
+
+    id: str = Field(default_factory=_uuid, primary_key=True)
+    email: str = Field(index=True, unique=True)
+    name: str = ""
+    password_hash: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class Document(SQLModel, table=True):
     id: str = Field(default_factory=_uuid, primary_key=True)
+    # None = documento de invitado (escaneado sin sesión).
+    user_id: str | None = Field(default=None, foreign_key="users.id", index=True)
     title: str
     category: str = "otro"
     summary: str = ""

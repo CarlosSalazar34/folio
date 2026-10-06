@@ -16,6 +16,7 @@ def _test_env(tmp_path_factory: pytest.TempPathFactory):
     os.environ["LOCAL_STORAGE_DIR"] = str(tmp / "storage")
     os.environ["S3_BUCKET"] = ""
     os.environ["OPENAI_APIKEY"] = "test"
+    os.environ["JWT_SECRET"] = "test-secret-no-usar-en-produccion-0123456789"
     yield
 
 

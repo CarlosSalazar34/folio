@@ -1,4 +1,5 @@
 import { Image } from "expo-image";
+import { router } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Alert, Pressable, Text, View } from "react-native";
 
@@ -13,7 +14,7 @@ export const AUTH_PROVIDER_LABELS: Record<AuthProvider, string> = {
 };
 
 type Props = {
-    /** Por defecto muestra "Próximamente": el inicio de sesión real llegará más adelante. */
+    /** Por defecto: correo abre /cuenta; Apple y Google muestran "Próximamente" (llegarán más adelante). */
     onPress?: (provider: AuthProvider) => void;
 };
 
@@ -22,7 +23,11 @@ function comingSoon() {
 }
 
 export function SocialAuthButtons({ onPress }: Props) {
-    const press = (provider: AuthProvider) => (onPress ? onPress(provider) : comingSoon());
+    const press = (provider: AuthProvider) => {
+        if (onPress) onPress(provider);
+        else if (provider === "email") router.push({ pathname: "/cuenta", params: { modo: "registro" } });
+        else comingSoon();
+    };
 
     return <View className="gap-3 w-full">
         <Pressable

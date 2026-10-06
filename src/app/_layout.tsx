@@ -8,6 +8,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useRef, useState } from "react";
 
 import { getPreference, usePreference } from "@/features/preferences/preferences";
+import { AuthProvider } from "@/features/auth/AuthContext";
 import { ScanSessionProvider } from "@/features/scan/ScanSession";
 
 // Mantener el splash visible hasta que las fuentes estén listas.
@@ -94,13 +95,14 @@ export default function RootLayout() {
 
   if (!ready) return null;
 
-  return <ScanSessionProvider>
+  return <AuthProvider><ScanSessionProvider>
     <Stack screenOptions={{headerShown: false}}>
       <Stack.Screen name="(tabs)"/>
       <Stack.Screen name="escanear" options={{ presentation: "fullScreenModal", animation: "slide_from_bottom", contentStyle: { backgroundColor: "black" } }}/>
       <Stack.Screen name="revisar" options={{ presentation: "fullScreenModal", animation: "slide_from_bottom", contentStyle: { backgroundColor: "#F3F2EE" } }}/>
       <Stack.Screen name="onboarding" options={{ presentation: "fullScreenModal", gestureEnabled: false, animation: onboardingCompleted || onboardingShown ? "fade" : "none", contentStyle: { backgroundColor: "#F3F2EE" } }}/>
       <Stack.Screen name="perfil" options={{ presentation: "modal", headerShown: true, contentStyle: { backgroundColor: "#F3F2EE" } }}/>
+      <Stack.Screen name="cuenta" options={{ presentation: "modal", headerShown: true, contentStyle: { backgroundColor: "#F3F2EE" } }}/>
     </Stack>
-  </ScanSessionProvider>;
+  </ScanSessionProvider></AuthProvider>;
 }

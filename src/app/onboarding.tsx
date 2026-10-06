@@ -84,12 +84,15 @@ export default function OnboardingScreen() {
     };
 
     const onSocial = (provider: AuthProvider) => {
+        if (provider === "email") {
+            // Al crear la cuenta, /cuenta marca la presentación como vista y cierra ambas pantallas.
+            router.push({ pathname: "/cuenta", params: { modo: "registro", desde: "onboarding" } });
+            return;
+        }
         Alert.alert(
             "Próximamente",
-            provider === "email"
-                ? "Crear una cuenta con correo llegará pronto. Por ahora puedes usar Folio sin cuenta."
-                : `El inicio de sesión con ${AUTH_PROVIDER_LABELS[provider]} llegará pronto. Por ahora puedes usar Folio sin cuenta.`,
-            [{ text: "Continuar sin cuenta", onPress: finish }],
+            `El inicio de sesión con ${AUTH_PROVIDER_LABELS[provider]} llegará pronto. Por ahora puedes usar Folio sin cuenta o con tu correo.`,
+            [{ text: "Continuar sin cuenta", onPress: finish }, { text: "Cerrar", style: "cancel" }],
         );
     };
 

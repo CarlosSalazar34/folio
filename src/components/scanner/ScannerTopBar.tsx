@@ -1,4 +1,4 @@
-import Animated, { FadeInUp } from "react-native-reanimated";
+import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { IconButton } from "@/components/ui/IconButton";
@@ -14,8 +14,7 @@ type Props = {
 export function ScannerTopBar({ torch, onToggleTorch, onClose }: Props) {
     const insets = useSafeAreaInsets();
 
-    return <Animated.View
-        entering={FadeInUp.delay(150).springify().damping(18)}
+    return <View
         className="absolute inset-x-0 px-4 flex-row items-center justify-between"
         style={{ top: insets.top + 8 }}
     >
@@ -34,5 +33,5 @@ export function ScannerTopBar({ torch, onToggleTorch, onClose }: Props) {
             className={torch ? "bg-lime" : "bg-black/50"}
             onPress={onToggleTorch}
         />
-    </Animated.View>;
+    </View>;
 }

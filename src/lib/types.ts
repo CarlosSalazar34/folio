@@ -55,3 +55,16 @@ export type LibraryStats = {
     /** ISO 8601 */
     last_scan_at: string | null;
 };
+
+export type User = {
+    id: string;
+    email: string;
+    name: string;
+    /** ISO 8601 */
+    created_at: string;
+};
+
+export type AuthResponse = {
+    token: string;
+    user: User;
+};

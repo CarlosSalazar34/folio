@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from folio.config import get_settings
 from folio.db import create_db_and_tables
+from folio.routes import auth as auth_routes
 from folio.routes import documents
 from folio.routes import stats as stats_routes
 from folio.storage import mount_local_files
@@ -24,6 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 mount_local_files(app)
+app.include_router(auth_routes.router)
 app.include_router(documents.router)
 app.include_router(stats_routes.router)
 

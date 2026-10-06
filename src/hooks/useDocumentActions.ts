@@ -5,7 +5,7 @@ import * as Sharing from "expo-sharing";
 import { useRef, useState } from "react";
 import { Alert } from "react-native";
 
-import { deleteDocument, pdfUrl } from "@/lib/api";
+import { authHeaders, deleteDocument, pdfUrl } from "@/lib/api";
 import type { DocumentDetail } from "@/lib/types";
 
 /** Nombre de archivo seguro a partir del título del documento. */
@@ -41,7 +41,7 @@ export function useDocumentActions(document: DocumentDetail | null) {
                 if (!document.pdf_url) throw new Error("Sin URL directa del PDF");
                 file = await File.downloadFileAsync(document.pdf_url, destination, { idempotent: true });
             } catch {
-                file = await File.downloadFileAsync(pdfUrl(document.id), destination, { idempotent: true });
+                file = await File.downloadFileAsync(pdfUrl(document.id), destination, { idempotent: true, headers: authHeaders() });
             }
             await Sharing.shareAsync(file.uri, {
                 mimeType: "application/pdf",

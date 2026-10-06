@@ -27,6 +27,11 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = ["*"]
 
+    # Firma de los tokens de sesión. Vacío en local: se genera una vez y se guarda en api/.jwt_secret.
+    # En producción (Railway) define JWT_SECRET.
+    jwt_secret: str = ""
+    jwt_expire_days: int = 30
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -16,8 +16,9 @@ from sqlmodel import Session, col, or_, select
 from folio import ai, imaging
 from folio import storage as storage_module
 from folio.ai import Corners, DocumentAnalysis, PageAnalysis
+from folio.auth import OptionalUser
 from folio.db import get_session
-from folio.models import Document, Page
+from folio.models import Document, Page, User
 from folio.schemas import CATEGORIES, Category, DocumentDetailOut, DocumentSummaryOut, KeyField, PageOut
 from folio.storage import LocalStorage, S3Storage, Storage
 
@@ -112,9 +113,19 @@ def _detail(doc: Document, storage: Storage, pdf_url: str | None = None) -> Docu
     )
 
 
-def _get_document(session: Session, document_id: str) -> Document:
+def _owner_id(user: User | None) -> str | None:
+    return user.id if user else None
+
+
+def _owned_by(user: User | None):
+    """Filtro: los documentos de la cuenta, o los de invitado si no hay sesión."""
+    return col(Document.user_id) == user.id if user else col(Document.user_id).is_(None)
+
+
+def _get_document(session: Session, document_id: str, user: User | None) -> Document:
     doc = session.get(Document, document_id)
-    if doc is None:
+    # Un documento ajeno responde igual que uno inexistente.
+    if doc is None or doc.user_id != _owner_id(user):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Documento no encontrado.")
     return doc
 
@@ -210,10 +221,12 @@ def _delete_keys(storage: Storage, keys: list[str]) -> None:
 def list_documents(
     session: SessionDep,
     storage: StorageDep,
+    user: OptionalUser,
     q: Annotated[str | None, Query(max_length=200)] = None,
 ) -> list[DocumentSummaryOut]:
     stmt = (
         select(Document)
+        .where(_owned_by(user))
         .options(selectinload(Document.pages))  # type: ignore[arg-type]
         .order_by(col(Document.created_at).desc(), col(Document.id).desc())
     )
@@ -230,9 +243,9 @@ def list_documents(
 
 @router.get("/{document_id}", response_model=DocumentDetailOut)
 def get_document(
-    document_id: str, session: SessionDep, storage: StorageDep, img: ImagingDep
+    document_id: str, session: SessionDep, storage: StorageDep, img: ImagingDep, user: OptionalUser
 ) -> DocumentDetailOut:
-    doc = _get_document(session, document_id)
+    doc = _get_document(session, document_id, user)
     return _detail(doc, storage, _ensure_pdf(doc, storage, img))
 
 
@@ -242,6 +255,7 @@ def create_document(
     storage: StorageDep,
     analyze: AnalyzerDep,
     img: ImagingDep,
+    user: OptionalUser,
     pages: Annotated[list[UploadFile], File(description="Imágenes de las páginas, en orden")],
     enhance: Annotated[bool, Form()] = True,
 ) -> DocumentDetailOut:
@@ -266,6 +280,7 @@ def create_document(
     page_analyses += [PageAnalysis() for _ in range(len(images) - len(page_analyses))]
 
     doc = Document(
+        user_id=_owner_id(user),
         title=analysis.title.strip() or "Documento sin título",
         category=_category(analysis.category),
         summary=analysis.summary,
@@ -335,8 +350,10 @@ def create_document(
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_document(document_id: str, session: SessionDep, storage: StorageDep) -> Response:
-    doc = _get_document(session, document_id)
+def delete_document(
+    document_id: str, session: SessionDep, storage: StorageDep, user: OptionalUser
+) -> Response:
+    doc = _get_document(session, document_id, user)
     keys = [k for p in doc.pages for k in (p.original_key, p.image_key, p.thumbnail_key)]
     keys.append(_pdf_key(doc.id))
     session.delete(doc)
@@ -351,8 +368,10 @@ def delete_document(document_id: str, session: SessionDep, storage: StorageDep) 
     response_class=Response,
     responses={200: {"content": {"application/pdf": {}}}},
 )
-def export_pdf(document_id: str, session: SessionDep, storage: StorageDep, img: ImagingDep) -> Response:
-    doc = _get_document(session, document_id)
+def export_pdf(
+    document_id: str, session: SessionDep, storage: StorageDep, img: ImagingDep, user: OptionalUser
+) -> Response:
+    doc = _get_document(session, document_id, user)
     if not doc.pages:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "El documento no tiene páginas.")
     # Compatibilidad: la app ahora descarga `pdf_url` directamente; esta ruta sirve el PDF guardado

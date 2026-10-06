@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from sqlmodel import Session, col, select
 
+from folio.auth import OptionalUser
 from folio.db import get_session
 from folio.models import Document, Page
 from folio.schemas import CATEGORIES, Category
@@ -24,8 +25,12 @@ class LibraryStatsOut(BaseModel):
 
 
 @router.get("", response_model=LibraryStatsOut)
-def get_stats(session: SessionDep) -> LibraryStatsOut:
-    page_count = session.exec(select(func.count(col(Page.id)))).one()
+def get_stats(session: SessionDep, user: OptionalUser) -> LibraryStatsOut:
+    # Solo la biblioteca de la cuenta (o la de invitado si no hay sesión).
+    owned = col(Document.user_id) == user.id if user else col(Document.user_id).is_(None)
+    page_count = session.exec(
+        select(func.count(col(Page.id))).join(Document, col(Page.document_id) == col(Document.id)).where(owned)
+    ).one()
 
     # Una sola consulta agrupada: los totales salen de sumar los grupos.
     rows = session.exec(
@@ -33,7 +38,9 @@ def get_stats(session: SessionDep) -> LibraryStatsOut:
             col(Document.category),
             func.count(col(Document.id)),
             func.max(col(Document.created_at)),
-        ).group_by(col(Document.category))
+        )
+        .where(owned)
+        .group_by(col(Document.category))
     ).all()
 
     categories: dict[Category, int] = {}

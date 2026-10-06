@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 
+from sqlalchemy import inspect, text
 from sqlmodel import Session, SQLModel, create_engine
 
 from folio.config import get_settings
@@ -23,6 +24,16 @@ def create_db_and_tables() -> None:
     from folio import models  # noqa: F401  (registra las tablas)
 
     SQLModel.metadata.create_all(engine)
+    _migrate()
+
+
+def _migrate() -> None:
+    """Migraciones mínimas para bases creadas antes de un cambio (create_all no añade columnas)."""
+    columns = {c["name"] for c in inspect(engine).get_columns("document")}
+    if "user_id" not in columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE document ADD COLUMN user_id VARCHAR"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_document_user_id ON document (user_id)"))
 
 
 def get_session() -> Iterator[Session]:
