@@ -38,6 +38,8 @@ export default function RootLayout() {
       <Stack.Screen name="(tabs)"/>
       <Stack.Screen name="escanear" options={{ presentation: "fullScreenModal", animation: "slide_from_bottom", contentStyle: { backgroundColor: "black" } }}/>
       <Stack.Screen name="revisar" options={{ presentation: "fullScreenModal", animation: "slide_from_bottom", contentStyle: { backgroundColor: "#F3F2EE" } }}/>
+      <Stack.Screen name="onboarding" options={{ presentation: "fullScreenModal", gestureEnabled: false, contentStyle: { backgroundColor: "#F3F2EE" } }}/>
+      <Stack.Screen name="perfil" options={{ presentation: "modal", headerShown: true, contentStyle: { backgroundColor: "#F3F2EE" } }}/>
     </Stack>
   </ScanSessionProvider>;
 }

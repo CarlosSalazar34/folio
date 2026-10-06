@@ -1,4 +1,4 @@
-import type { DocumentDetail, DocumentSummary } from "@/lib/types";
+import type { DocumentDetail, DocumentSummary, LibraryStats } from "@/lib/types";
 
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
@@ -29,6 +29,19 @@ export function getDocument(id: string): Promise<DocumentDetail> {
 
 export function deleteDocument(id: string): Promise<void> {
     return request(`/documents/${id}`, { method: "DELETE" });
+}
+
+export function getStats(): Promise<LibraryStats> {
+    return request("/stats");
+}
+
+export async function checkHealth(): Promise<boolean> {
+    try {
+        await request<{ status: string }>("/health");
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 export function pdfUrl(id: string): string {

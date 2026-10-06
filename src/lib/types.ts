@@ -44,4 +44,14 @@ export type DocumentDetail = DocumentSummary & {
     text: string;
     key_fields: KeyField[];
     pages: Page[];
+    /** URL directa (prefirmada en S3) del PDF; null si aún no se ha generado. */
+    pdf_url: string | null;
+};
+
+export type LibraryStats = {
+    document_count: number;
+    page_count: number;
+    categories: Partial<Record<Category, number>>;
+    /** ISO 8601 */
+    last_scan_at: string | null;
 };

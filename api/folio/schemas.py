@@ -33,3 +33,5 @@ class DocumentDetailOut(DocumentSummaryOut):
     text: str
     key_fields: list[KeyField]
     pages: list[PageOut]
+    # URL directa del PDF (prefirmada en S3); None si aún no se ha generado.
+    pdf_url: str | None = None
