@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=API_DIR / ".env", extra="ignore")
 
     openai_api_key: str = Field(default="", validation_alias=AliasChoices("OPENAI_APIKEY", "OPENAI_API_KEY"))
-    # La unidad de IA fija el modelo por defecto tras revisar la documentación de OpenAI.
-    openai_model: str = ""
+    # Modelo con visión y salida estructurada; el más eficiente de la familia GPT-6 (override: OPENAI_MODEL).
+    openai_model: str = "gpt-6-luna"
 
     database_url: str = f"sqlite:///{API_DIR / 'folio.db'}"
 
