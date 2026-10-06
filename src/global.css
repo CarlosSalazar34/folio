@@ -1,7 +1,26 @@
+/*
+ * Tipografía de Folio
+ * En React Native cada peso es una familia distinta (p. ej. "Geist_600SemiBold"),
+ * así que `font-semibold` NO cambia de familia: usa estos tokens explícitos.
+ * Las fuentes se cargan con useFonts en src/app/_layout.tsx.
+ *
+ *   font-display          Bricolage Grotesque 700  → títulos y logo (+ tracking-tight)
+ *   font-sans             Geist 400                → UI y texto de cuerpo
+ *   font-sans-medium      Geist 500
+ *   font-sans-semibold    Geist 600
+ *   font-mono             Geist Mono 400           → metadatos (páginas, tamaño, fecha)
+ *   font-mono-medium      Geist Mono 500
+ *
+ * NativeWind no aplica una fuente por defecto a todos los <Text>: añade
+ * `font-sans` (o la variante que corresponda) en cada texto.
+ */
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/preflight.css" layer(base);
 @import "tailwindcss/utilities.css";
 @import "nativewind/theme";
+
+/* Genera siempre las clases de fuente aunque aún no se usen en ningún archivo. */
+@source inline("font-display font-sans font-sans-medium font-sans-semibold font-mono font-mono-medium");
 
 @theme {
   --color-ink: #121212;
@@ -9,4 +28,18 @@
   --color-cobalt: #2747f5;
   --color-lime: #c6f432;
   --color-graphite: #5e5d58;
+}
+
+/*
+ * `inline`: las utilidades usan el valor literal en lugar de var(--font-*).
+ * nativewind/theme redefine --font-sans/--font-mono por plataforma (System,
+ * Menlo…) y, sin `inline`, esas variables pisarían a Geist en iOS/Android.
+ */
+@theme inline {
+  --font-display: "BricolageGrotesque_700Bold";
+  --font-sans: "Geist_400Regular";
+  --font-sans-medium: "Geist_500Medium";
+  --font-sans-semibold: "Geist_600SemiBold";
+  --font-mono: "GeistMono_400Regular";
+  --font-mono-medium: "GeistMono_500Medium";
 }
