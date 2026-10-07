@@ -12,9 +12,8 @@
 - [ ] Recorrer todo el flujo: onboarding → crear cuenta → escanear → revisar → analizar con IA → detalle → compartir PDF → perfil → cerrar sesión.
 
 ## 2. Credenciales e infraestructura
-- [ ] **S3**: terminar el alta en AWS (se quedó en la verificación por teléfono) y rellenar en `api/.env`: `S3_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`. Mientras tanto se usa almacenamiento local (`api/storage/`).
-  - Alternativa: Cloudflare R2 (compatible con S3; requiere añadir `S3_ENDPOINT_URL` al backend).
-- [ ] **Railway**: desplegar `api/` con `DATABASE_URL` (plugin Postgres), `JWT_SECRET` (texto largo aleatorio, **obligatorio**: sin él cada despliegue invalida las sesiones), `OPENAI_APIKEY` y las variables de S3.
+- [ ] **Cloudflare R2** (AWS no completó el alta): crear el bucket y un token de API "Object Read & Write" y rellenar en `api/.env`: `S3_ENDPOINT_URL`, `S3_BUCKET`, `AWS_REGION=auto`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (pasos en `api/README.md`). Mientras tanto se usa almacenamiento local (`api/storage/`).
+- [ ] **Railway**: desplegar `api/` con `DATABASE_URL` (plugin Postgres), `JWT_SECRET` (texto largo aleatorio, **obligatorio**: sin él cada despliegue invalida las sesiones), `OPENAI_APIKEY` y las variables de R2.
 
 ## 3. Funciones
 - [ ] Iniciar sesión con **Apple** (`expo-apple-authentication`) y **Google**. Hoy muestran "Próximamente".

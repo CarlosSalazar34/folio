@@ -1,9 +1,12 @@
+import secrets
 import uuid
 
 import pytest
 from sqlmodel import Session, delete
 
-PASSWORD = "contraseña-segura"
+# Contraseñas aleatorias por ejecución: nunca literales en el repo.
+PASSWORD = secrets.token_urlsafe(16)
+OTHER_PASSWORD = secrets.token_urlsafe(16)
 
 
 @pytest.fixture(autouse=True)
@@ -67,7 +70,7 @@ def test_register_duplicate_email_is_409(client):
     "payload",
     [
         {"email": "no-es-un-correo", "password": PASSWORD},
-        {"email": "a@b.co", "password": "corta"},
+        {"email": "a@b.co", "password": PASSWORD[:7]},
     ],
 )
 def test_register_validation(client, payload):
@@ -89,7 +92,7 @@ def test_login_and_me(client):
 def test_login_wrong_password_or_unknown_email_is_401(client):
     email = _email()
     _register(client, email=email)
-    wrong = client.post("/auth/login", json={"email": email, "password": "otra-contraseña"})
+    wrong = client.post("/auth/login", json={"email": email, "password": OTHER_PASSWORD})
     unknown = client.post("/auth/login", json={"email": _email(), "password": PASSWORD})
     assert wrong.status_code == unknown.status_code == 401
     assert wrong.json()["detail"] == unknown.json()["detail"]

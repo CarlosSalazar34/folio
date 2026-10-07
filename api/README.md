@@ -30,8 +30,23 @@ Sin `DATABASE_URL` usa SQLite (`folio.db`); sin `S3_BUCKET` guarda las imágenes
    (`${{Postgres.DATABASE_URL}}`). `postgres://` y `postgresql://` se convierten solos a `postgresql+psycopg://`.
 3. Variables:
    - `OPENAI_APIKEY` (o `OPENAI_API_KEY`), opcional `OPENAI_MODEL`
-   - `S3_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, opcional `S3_PREFIX` (por defecto `folio/`)
+   - `JWT_SECRET`: texto largo y aleatorio (**obligatorio**; sin él cada despliegue cierra todas las sesiones)
+   - Almacenamiento (Cloudflare R2 o AWS S3): `S3_BUCKET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+     `AWS_REGION` y, para R2, `S3_ENDPOINT_URL`; opcional `S3_PREFIX` (por defecto `folio/`)
    - `PUBLIC_BASE_URL` = URL pública del servicio (solo se usa con almacenamiento local)
    - opcional `CORS_ORIGINS` (JSON, p. ej. `["https://folio.app"]`)
 
-Railway no guarda el disco entre despliegues: en producción configura S3.
+Railway no guarda el disco entre despliegues: en producción configura R2 o S3.
+
+### Cloudflare R2
+
+1. En Cloudflare: **R2 → Create bucket** (p. ej. `folio-docs`). El bucket es privado; la app usa URLs prefirmadas.
+2. **R2 → Manage API tokens → Create API token** con permiso **Object Read & Write**, limitado a ese bucket.
+3. Variables:
+   ```
+   S3_ENDPOINT_URL=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+   S3_BUCKET=folio-docs
+   AWS_REGION=auto
+   AWS_ACCESS_KEY_ID=<Access Key ID del token>
+   AWS_SECRET_ACCESS_KEY=<Secret Access Key del token>
+   ```

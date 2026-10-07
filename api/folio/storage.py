@@ -1,6 +1,7 @@
 """Almacenamiento de imágenes: S3 si S3_BUCKET está definido, si no, disco local.
 
-- `S3Storage`: boto3; `url` devuelve una URL GET prefirmada.
+- `S3Storage`: boto3; `url` devuelve una URL GET prefirmada. Funciona con AWS S3 y con
+  servicios compatibles como Cloudflare R2 (definiendo `S3_ENDPOINT_URL`).
 - `LocalStorage`: archivos bajo `LOCAL_STORAGE_DIR`, servidos por FastAPI en `/files`
   (ver `mount_local_files`).
 """
@@ -112,9 +113,23 @@ def _make_s3_client(settings: Settings) -> Any:
     import boto3
     from botocore.config import Config
 
-    kwargs: dict[str, Any] = {"config": Config(signature_version="s3v4")}
-    if settings.aws_region:
-        kwargs["region_name"] = settings.aws_region
+    kwargs: dict[str, Any] = {}
+    config = Config(signature_version="s3v4")
+    region = settings.aws_region
+    if settings.s3_endpoint_url:
+        # Servicio compatible con S3 (Cloudflare R2): endpoint propio, región "auto",
+        # bucket en la ruta de la URL y checksums solo cuando la operación los exige
+        # (boto3 los envía por defecto y no todos los servicios compatibles los aceptan).
+        kwargs["endpoint_url"] = settings.s3_endpoint_url.rstrip("/")
+        region = region or "auto"
+        config = config.merge(Config(
+            s3={"addressing_style": "path"},
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
+        ))
+    kwargs["config"] = config
+    if region:
+        kwargs["region_name"] = region
     # Sin keys explícitas, boto3 usa su cadena de credenciales por defecto (env, perfil, rol IAM).
     if settings.aws_access_key_id and settings.aws_secret_access_key:
         kwargs["aws_access_key_id"] = settings.aws_access_key_id

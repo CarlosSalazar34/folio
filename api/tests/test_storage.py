@@ -107,3 +107,30 @@ def test_s3_get_missing_raises(s3):
     stubber.add_client_error("get_object", "NoSuchKey", http_status_code=404, expected_params={"Bucket": "bucket", "Key": ANY})
     with pytest.raises(ClientError):
         storage.get("docs/missing.jpg")
+
+
+def test_r2_endpoint_client_builds_path_style_presigned_urls():
+    from folio.config import Settings
+    from folio.storage import _make_s3_client
+
+    settings = Settings(
+        _env_file=None,
+        s3_endpoint_url="https://cuenta.r2.cloudflarestorage.com/",
+        aws_access_key_id="k",
+        aws_secret_access_key="s",
+    )
+    client = _make_s3_client(settings)
+    assert client.meta.region_name == "auto"
+    url = S3Storage("folio-docs", "folio/", client=client).url("docs/a.jpg", expires_in=60)
+    assert url.startswith("https://cuenta.r2.cloudflarestorage.com/folio-docs/folio/docs/a.jpg?")
+    assert "X-Amz-Expires=60" in url
+
+
+def test_aws_client_without_endpoint_keeps_default_host():
+    from folio.config import Settings
+    from folio.storage import _make_s3_client
+
+    settings = Settings(_env_file=None, aws_region="eu-west-1", aws_access_key_id="k", aws_secret_access_key="s")
+    client = _make_s3_client(settings)
+    assert client.meta.region_name == "eu-west-1"
+    assert "amazonaws.com" in client.meta.endpoint_url

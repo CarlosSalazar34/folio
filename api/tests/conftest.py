@@ -1,4 +1,5 @@
 import os
+import secrets
 import sys
 from pathlib import Path
 
@@ -16,7 +17,8 @@ def _test_env(tmp_path_factory: pytest.TempPathFactory):
     os.environ["LOCAL_STORAGE_DIR"] = str(tmp / "storage")
     os.environ["S3_BUCKET"] = ""
     os.environ["OPENAI_APIKEY"] = "test"
-    os.environ["JWT_SECRET"] = "test-secret-no-usar-en-produccion-0123456789"
+    # Secreto aleatorio por ejecución: nunca un literal en el repo.
+    os.environ["JWT_SECRET"] = secrets.token_urlsafe(32)
     yield
 
 

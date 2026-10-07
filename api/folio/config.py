@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     database_url: str = f"sqlite:///{API_DIR / 'folio.db'}"
 
     s3_bucket: str = ""
+    # Vacío = AWS S3. Para Cloudflare R2: https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+    s3_endpoint_url: str = ""
     s3_prefix: str = "folio/"
     aws_region: str = ""
     aws_access_key_id: str = ""
