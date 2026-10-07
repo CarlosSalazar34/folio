@@ -3,7 +3,7 @@
 Última revisión: 6 de octubre de 2026.
 
 ## 1. Probar en el iPhone (prioridad)
-- [ ] Cambiar `EXPO_PUBLIC_API_URL` en `.env.local` a la IP de la Mac (p. ej. `http://172.20.10.2:8000`); `127.0.0.1` no llega desde el iPhone.
+- [ ] Cambiar `EXPO_PUBLIC_API_URL` en `.env.local` a la IP local de la Mac (`http://<IP-de-tu-Mac>:8000`; se obtiene con `ipconfig getifaddr en0`); `127.0.0.1` no llega desde el iPhone.
 - [ ] Recompilar la app (hay módulos nativos nuevos: `expo-sqlite`, `expo-secure-store`, `expo-haptics`, `expo-file-system`, `expo-sharing`, `expo-image-manipulator`):
   ```bash
   npx expo prebuild --clean
